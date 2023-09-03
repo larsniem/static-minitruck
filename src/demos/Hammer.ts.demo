@@ -1,0 +1,34 @@
+// main function executed on run
+function run() {
+  const scale = 0.05
+
+  const shaftLength = 20
+  const shaftDiameter = 3
+  const headLength = 2/3 * shaftLength
+  const headWidth = 2*shaftDiameter
+  const headHeight = headWidth
+
+  const w_origin = new Float64Array([0,0,0])
+  const y_axis = new Float64Array([0,1,0])
+  // Prevent touching faces, Truck currently can't handle these
+  const jitter = 0.1
+
+  // shaft
+  let vertex = Truck.vertex(shaftDiameter/2, 0, 0)
+  let wire = Truck.rsweep(vertex.upcast(), w_origin, y_axis, 7).into_wire()
+  let face = Truck.try_attach_plane(wire)
+  let shaft = Truck.tsweep(face.upcast(), new Float64Array([0, shaftLength + jitter, 0])).into_solid()
+
+  // head
+  vertex = Truck.vertex(-headWidth/2, shaftLength, -headLength/2)
+  let edge = Truck.tsweep(vertex.upcast(), new Float64Array([headWidth, 0, 0])).into_edge()
+  face = Truck.tsweep(edge.upcast(), new Float64Array([0, 0, headLength])).into_face()
+  let head = Truck.tsweep(face.upcast(), new Float64Array([0, headHeight, 0])).into_solid()
+  // Invert Normals
+  head = Truck.not(head)
+
+  let body = Truck.or(shaft, head, 0.05)
+  body = Truck.scaled(body.upcast(), w_origin, new Float64Array([scale, scale, scale])).into_solid()
+
+  return [body];
+}

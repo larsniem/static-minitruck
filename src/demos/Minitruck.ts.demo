@@ -1,0 +1,206 @@
+// main function executed on run
+
+class BaseBodyBuilder {
+  length = 4.5
+  width = 1.5
+  groundClearance = 0.15
+  frontHeight = 0.7
+  frontLength = 0.5
+  windshieldBaseHeight = 0.8
+  windshieldDepth = 0.1
+  cabinHeight = 1.5
+  cabinLength = 1.0
+  bedHeight = 0.9
+  bedLength = 2.9
+  origin = [0, 0, 0]
+
+  commit() {
+    const jitter = 0.0001
+    const extrudeVector = new Float64Array([0, 0, this.width])
+
+    const v00 = Truck.vertex(0, this.groundClearance+this.frontHeight, 0)
+    const v01 = Truck.vertex(0, this.groundClearance, 0)
+    const e01 = Truck.line(v00, v01)
+    const v02 = Truck.vertex(this.frontLength, this.groundClearance+this.windshieldBaseHeight, 0)
+    const v03 = Truck.vertex(this.frontLength, this.groundClearance, 0)
+    const e02 = Truck.line(v02, v03)
+
+    const frontFace = Truck.homotopy(e01, e02)
+    const front = Truck.tsweep(frontFace.upcast(), extrudeVector)
+    
+    const v04 = Truck.vertex(this.frontLength - jitter , this.groundClearance+this.windshieldBaseHeight - jitter, 0 - jitter)
+    const v05 = Truck.vertex(this.frontLength - jitter , this.groundClearance - jitter, 0 - jitter)
+    const e03 = Truck.line(v04, v05)
+    const v06 = Truck.vertex(this.frontLength+this.windshieldDepth, this.groundClearance+this.cabinHeight, 0)
+    const v07 = Truck.vertex(this.frontLength+this.windshieldDepth, this.groundClearance, 0)
+    const e04 = Truck.line(v06, v07)
+
+    const windshieldFace = Truck.homotopy(e03, e04)
+    const windshield = Truck.tsweep(windshieldFace.upcast(), extrudeVector)
+
+    let body = Truck.or(front.into_solid(), windshield.into_solid(), 0.05)
+
+    const v08 = Truck.vertex(this.frontLength + this.windshieldDepth - jitter , this.groundClearance+this.cabinHeight - jitter, 0 - jitter)
+    const v09 = Truck.vertex(this.frontLength + this.windshieldDepth - jitter , this.groundClearance - jitter, 0 - jitter)
+    const e05 = Truck.line(v08, v09)
+    const v10 = Truck.vertex(this.frontLength+this.windshieldDepth+this.cabinLength, this.groundClearance+this.cabinHeight, 0)
+    const v11 = Truck.vertex(this.frontLength+this.windshieldDepth+this.cabinLength, this.groundClearance, 0)
+    const e06 = Truck.line(v10, v11)
+
+    const cabinFace = Truck.homotopy(e05, e06)
+    const cabin = Truck.tsweep(cabinFace.upcast(), extrudeVector)
+
+    body = Truck.or(body, cabin.into_solid())
+
+    const v12 = Truck.vertex(this.length - this.bedLength - jitter , this.groundClearance+this.bedHeight - jitter, 0 - jitter)
+    const v13 = Truck.vertex(this.length - this.bedLength - jitter , this.groundClearance - jitter, 0 - jitter)
+    const e07 = Truck.line(v12, v13)
+    const v14 = Truck.vertex(this.length, this.groundClearance+this.bedHeight, 0)
+    const v15 = Truck.vertex(this.length, this.groundClearance, 0)
+    const e08 = Truck.line(v14, v15)
+
+    const bedFace = Truck.homotopy(e07, e08)
+    const bed = Truck.tsweep(bedFace.upcast(), extrudeVector)
+
+    body = Truck.or(body, bed.into_solid())
+
+    body = Truck.translated(body.upcast(), new Float64Array([
+      this.origin[0]-this.length/2,
+      this.origin[1],
+      this.origin[2]-this.width/2
+    ])).into_solid()
+
+    return body
+  }
+}
+
+class WheelBuilder {
+  origin = [0, 0, 0]
+  diameter = 1.0
+  width = 1.0
+
+  commit() {
+    const v0 = Truck.vertex(0, this.diameter/2, 0)
+
+    const wire = Truck.rsweep(v0.upcast(), new Float64Array([0,0,0]), new Float64Array([0,0,1]), 7.0)
+    const face = Truck.try_attach_plane(wire.into_wire())
+    const solid = Truck.tsweep(face.upcast(), new Float64Array([0, 0, this.width]))
+
+    const translated = Truck.translated(solid, new Float64Array(this.origin))
+
+    return translated.into_solid()
+  }
+}
+
+function run() {
+  const w_origin = new Float64Array([0,0,0])
+  const x_m_origin = new Float64Array([1,1,-1])
+
+  // Dimensions
+  const scale = 0.5
+
+  const wheelbase = 2.5 * scale
+  const wheelDiameter = 0.7 * scale
+  const wheelwidth = 0.25 * scale
+  const wheelInset = 0.05 * scale
+  const chamberOffset = 0.03 * scale
+  const groundClearence = 0.2  * scale
+  const overhangFront = 0.2 * scale
+  const overhangRear = 0.5 * scale
+  const width = 1.5 * scale
+  const frontHeight = 0.7 * scale
+  const frontLength = 1.0 * scale
+  const windshieldBaseHeight = 0.9 * scale
+  const windshieldDepth = 0.3 * scale
+  const cabinHeight = 1.5 * scale
+  const cabinLength = 1.0 * scale
+
+  const overallLength = overhangFront + wheelbase + 2 * (wheelDiameter + 2*chamberOffset) + overhangRear
+  const bedHeight = windshieldBaseHeight
+  const bedLength = overallLength - frontLength - windshieldDepth - cabinLength
+  const chamberDiameter = wheelDiameter + 2 * chamberOffset
+  const chamberWidth = width
+  const wheelCenter = [
+    0,
+    wheelDiameter/2,
+    width/2 - wheelwidth - wheelInset
+  ]
+
+  const bodyBuilder = new BaseBodyBuilder()
+
+  bodyBuilder.length = overallLength
+  bodyBuilder.width = width
+  bodyBuilder.groundClearance = groundClearence
+  bodyBuilder.frontHeight = frontHeight
+  bodyBuilder.frontLength = frontLength
+  bodyBuilder.windshieldBaseHeight = windshieldBaseHeight
+  bodyBuilder.windshieldDepth = windshieldDepth
+  bodyBuilder.cabinHeight = cabinHeight
+  bodyBuilder.cabinLength = cabinLength
+  bodyBuilder.bedHeight = bedHeight
+  bodyBuilder.bedLength = bedLength
+
+  let body = bodyBuilder.commit()
+
+  // Rear
+  // Wheelchamber
+  let wheelChamberCenter = Object.assign([], wheelCenter)
+  wheelChamberCenter[0] = overallLength / 2 - chamberDiameter / 2 - overhangRear
+
+  let wheelChamberBuilder = new WheelBuilder()
+  wheelChamberBuilder.width = chamberWidth
+  wheelChamberBuilder.diameter = chamberDiameter
+  wheelChamberBuilder.origin = wheelChamberCenter
+
+  let wheelChamber = wheelChamberBuilder.commit()
+  wheelChamber = Truck.not(wheelChamber)
+  body = Truck.and(body, wheelChamber, 0.05)
+
+  // Wheel
+  wheelCenter[0] = wheelChamberCenter[0]
+  wheelCenter[2] -= wheelInset
+
+  let wheelBuilder = new WheelBuilder()
+  wheelBuilder.diameter = wheelDiameter
+  wheelBuilder.width = wheelwidth + 2 * wheelInset
+  wheelBuilder.origin = wheelCenter
+  let wheel = wheelBuilder.commit()
+  body = Truck.or(body, wheel, 0.005)
+
+  // Mirror
+  wheelChamber = wheelChamberBuilder.commit()
+  wheelChamber = Truck.scaled(wheelChamber.upcast(), w_origin, x_m_origin).into_solid()
+  // Mirror inverts normals
+  body = Truck.and(body, wheelChamber)
+
+  wheel = wheelBuilder.commit()
+  wheel = Truck.scaled(wheel.upcast(), w_origin, x_m_origin).into_solid()
+  wheel = Truck.not(wheel)
+  body = Truck.or(body, wheel, 0.005)
+
+  // Front
+  // Wheelchamber
+  wheelChamberCenter[0] = -overallLength / 2 + chamberDiameter / 2 + overhangFront
+  wheelChamberBuilder.origin = wheelChamberCenter
+  wheelChamber = wheelChamberBuilder.commit()
+  wheelChamber = Truck.not(wheelChamber)
+  body = Truck.and(body, wheelChamber)
+
+  // Wheel
+  wheelCenter[0] = wheelChamberCenter[0]
+  wheelBuilder.origin = wheelCenter
+  wheel = wheelBuilder.commit()
+  body = Truck.or(body, wheel, 0.005)
+
+  // Mirror
+  wheelChamber = wheelChamberBuilder.commit()
+  wheelChamber = Truck.scaled(wheelChamber.upcast(), w_origin, x_m_origin).into_solid()
+  body = Truck.and(body, wheelChamber)
+
+  wheel = wheelBuilder.commit()
+  wheel = Truck.scaled(wheel.upcast(), w_origin, x_m_origin).into_solid()
+  wheel = Truck.not(wheel)
+  body = Truck.or(body, wheel, 0.005)
+  
+  return [body]
+}

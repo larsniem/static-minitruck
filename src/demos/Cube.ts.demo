@@ -1,0 +1,12 @@
+function run() {
+    // create a vertex
+    const v = Truck.vertex(-0.5, -0.5, -0.5);
+    // extrude the vertex to an edge
+    const e = Truck.tsweep(v.upcast(), new Float64Array([0.1, 0.0, 0.0]));
+    // extrude the edge to a square face
+    const f = Truck.tsweep(e, new Float64Array([0.0, 0.5, 0.0]));
+    // extrude the face to a solid cube
+    const abstract_shape = Truck.tsweep(f, new Float64Array([0.0, 0.0, 1.0]));
+    // abstarct shape is a shell or a solid
+    return [abstract_shape.into_solid()];
+}
